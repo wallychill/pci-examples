@@ -74,3 +74,4 @@ def topMatches (prefs, person, n=5, similarity=sim_pearson):
     scores.sort()
     scores.reverse()
     return scores[0:n]
+	
