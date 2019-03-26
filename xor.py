@@ -6,10 +6,8 @@
 #
 
 import random
+import pdb
 from math import sqrt, exp
-
-def dtanh(self, y):
-	return 1.0-y*y
 	
 def sigmoid_derivative(x):
 	return x * (1-x)
@@ -20,8 +18,7 @@ def sigmoid_derivative(x):
 #
 class synapse:
 	def __init__(self, n):
-		#self.weight = random.random()
-		self.weight = 0.5
+		self.weight = random.gauss(0.5, 0.33)
 		self.neuron = n
 		
 	def get_value(self):
@@ -84,7 +81,7 @@ class neuron:
 
 class neuralnet:
 	def __init__(self, nInput, nHidden, nOutput):
-		self.learningRate = 0.1
+		self.learningRate = 0.5
 		self.input = []
 		for i in range(0, nInput):
 			self.input.append(neuron(neuron.FUNCTION_LINEAR))
@@ -104,6 +101,12 @@ class neuralnet:
 		for o in self.output:
 			for h in self.hidden:
 				o.add_synapse(h)
+				
+		# Open .csv file for debugging / algorithm profiling
+		self.csv = open("xor.csv", "w")
+		
+	def __del__(self):
+		self.csv.close()
 	
 	def __str__(self):
 		s = "Inputs:\n"
@@ -134,8 +137,46 @@ class neuralnet:
 		for o in self.output:
 			o.compute()
 
+	def train_single_output(self, inValues, outValue, nCycles):
+		for i in range(nCycles):
+			# Apply input values and forward-propagate neural net
+			self.update(inValues)
+			
+			# Calculate
+			outputNeuron = self.output[0]
+			outputErrorSum = outValue - outputNeuron.output
+			derivative = sigmoid_derivative(outputNeuron.output)
+			deltaOutputSum = derivative * outputErrorSum
+			
+			# Calculate delta weights to output layer synapses, do not apply yet
+			deltaOutputWeight = []
+			for s in outputNeuron.synapses:
+				dw = deltaOutputSum / s.neuron.output
+				deltaOutputWeight.append(dw)
+							
+			# Calculate hidden sum deltas
+			deltaHiddenFactor = []
+			for j in range(len(outputNeuron.synapses)):
+				dhf = deltaOutputSum / outputNeuron.synapses[j].weight
+				deltaHiddenFactor.append(dhf)
+
+			deltaHiddenSum = []
+			for k in range(len(self.hidden)):
+				dhs = deltaHiddenFactor[k] * sigmoid_derivative(self.hidden[k].output)
+				deltaHiddenSum.append(dhs)
+
+				for m in range(len(self.hidden[k].synapses)):
+					deltaInputWeight = dhs
+					self.hidden[k].synapses[m].weight += deltaInputWeight * self.learningRate
+				
+			# Apply weights to output layer synapses
+			for j in range(len(outputNeuron.synapses)):
+				outputNeuron.synapses[j].weight += deltaOutputWeight[j] * self.learningRate
+				self.csv.write('{:8.6f}'.format(outputNeuron.synapses[j].weight) + ', ')
+			self.csv.write("\n")
+						
 	def train(self, inValues, outValues, nCycles):
-		for i in range(0, nCycles):
+		for i in range(nCycles):
 			self.update(inValues)
 
 			# Calculate total squared error over all output values
@@ -193,24 +234,34 @@ def sample(inValues, outValues, nSamples, epsilon):
 
 # Create neural network
 nn = neuralnet(2, 3, 1)
-	
-#[nSuccess, nFailure] = sample([0,1], 1000)
-#print ("nSuccess = " + '{:5d}'.format(nSuccess) + "    nFailure = " + '{:5d}'.format(nFailure))
 
-nn.train([0,1], [1], 10000)
+# Override synapse weights to match example
+#nn.output[0].synapses[0].weight = 0.3
+#nn.output[0].synapses[1].weight = 0.5
+#nn.output[0].synapses[2].weight = 0.9
+
+#nn.hidden[0].synapses[0].weight = 0.8
+#nn.hidden[0].synapses[1].weight = 0.2
+
+#nn.hidden[1].synapses[0].weight = 0.4
+#nn.hidden[1].synapses[1].weight = 0.9
+
+#nn.hidden[2].synapses[0].weight = 0.3
+#nn.hidden[2].synapses[1].weight = 0.5
 print(nn)
 
-print (sample([0,1],[1],100,0.05))
+for i in range(1000):
+	nn.train_single_output([0,0], 0, 1)
+	nn.train_single_output([0,1], 1, 1)
+	nn.train_single_output([1,0], 1, 1)
+	nn.train_single_output([1,1], 0, 1)
 
-#for i in range(10000):
-#	nn.train([0,1], [1], 1)
-#	nn.train([1,1], [0], 1)
-
-
-#print (nn.output[0].value)
-
-#(nSuccess, nFailure) = sample([0,1], 1000)
-#print ("nSuccess = " + '{:5d}'.format(nSuccess) + "    nFailure = " + '{:5d}'.format(nFailure))
-
-#print(nn)
+nn.update([0,0])
+print(nn)
+nn.update([0,1])
+print(nn)
+nn.update([1,0])
+print(nn)
+nn.update([1,1])
+print(nn)
 
